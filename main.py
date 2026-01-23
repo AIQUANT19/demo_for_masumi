@@ -347,7 +347,7 @@ async def input_schema():
                 "type": "string",
                 "name": "Task Description",
                 "data": {
-                    "description": "The text input for the AI task",
+                    "description": "Search weather update of Kolkata for today.",
                     "placeholder": "Enter your task description here",
                 },
             }
