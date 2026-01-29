@@ -2,7 +2,7 @@ import os
 import uuid
 import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 
 import uvicorn
@@ -149,9 +149,13 @@ class AskRequest(BaseModel):
     message: str
     timezone: Optional[str] = None
 
+class InputField(BaseModel):
+    id: str
+    value: Any
+
 class StartJobRequest(BaseModel):
     identifier_from_purchaser: str
-    input_data: dict
+    input_data: List[InputField]
 
 class ProvideInputRequest(BaseModel):
     job_id: str
@@ -197,11 +201,20 @@ async def start_job(data: StartJobRequest):
         # Prepare payment amounts
         amounts = [Amount(amount=PAYMENT_AMOUNT, unit=PAYMENT_UNIT)]
 
+        # payment = Payment(
+        #     agent_identifier=AGENT_IDENTIFIER,
+        #     config=masumi_config,
+        #     identifier_from_purchaser=data.identifier_from_purchaser,
+        #     input_data=data.input_data,
+        #     network=NETWORK,
+        # )
+        normalized_input = {item.id: item.value for item in data.input_data}
+
         payment = Payment(
             agent_identifier=AGENT_IDENTIFIER,
             config=masumi_config,
             identifier_from_purchaser=data.identifier_from_purchaser,
-            input_data=data.input_data,
+            input_data=normalized_input,
             network=NETWORK,
         )
 
@@ -215,7 +228,7 @@ async def start_job(data: StartJobRequest):
             "status": "awaiting_payment",
             "payment_status": "pending",
             "blockchain_identifier": blockchain_identifier,
-            "input_data": data.input_data,
+            "input_data": normalized_input,
             "result": None,
             "identifier_from_purchaser": data.identifier_from_purchaser,
         }
@@ -347,8 +360,8 @@ async def input_schema():
                 "type": "string",
                 "name": "Task Description",
                 "data": {
-                    "description": "Search weather update of Kolkata for today.",
-                    "placeholder": "Enter your task description here",
+                    "description": "Enter any city to get current weather.",
+                    "placeholder": "e.g. Weather in Mumbai",
                 },
             }
         ]
