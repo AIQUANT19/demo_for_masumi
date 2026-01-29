@@ -150,7 +150,7 @@ class AskRequest(BaseModel):
     timezone: Optional[str] = None
 
 class InputField(BaseModel):
-    id: str
+    key: str
     value: Any
 
 class StartJobRequest(BaseModel):
@@ -208,8 +208,7 @@ async def start_job(data: StartJobRequest):
         #     input_data=data.input_data,
         #     network=NETWORK,
         # )
-        normalized_input = {item.id: item.value for item in data.input_data}
-
+        normalized_input = {item.key: item.value for item in data.input_data}
         payment = Payment(
             agent_identifier=AGENT_IDENTIFIER,
             config=masumi_config,
