@@ -2,6 +2,7 @@ import os
 import uuid
 import asyncio
 import logging
+import hashlib
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 
@@ -42,7 +43,7 @@ AGENT_IDENTIFIER = os.getenv("AGENT_IDENTIFIER")
 PAYMENT_SERVICE_URL = os.getenv("PAYMENT_SERVICE_URL")
 PAYMENT_API_KEY = os.getenv("PAYMENT_API_KEY")
 NETWORK = os.getenv("NETWORK", "Preprod")
-PAYMENT_AMOUNT = os.getenv("PAYMENT_AMOUNT", "10000000")
+PAYMENT_AMOUNT = int(os.getenv("PAYMENT_AMOUNT", "10000000"))
 PAYMENT_UNIT = os.getenv("PAYMENT_UNIT", "lovelace")
 SELLER_VKEY = os.getenv("SELLER_VKEY")
 WEATHERSTACK_API_KEY = os.getenv("WEATHERSTACK_API_KEY")
@@ -155,7 +156,7 @@ class InputField(BaseModel):
 
 class StartJobRequest(BaseModel):
     identifier_from_purchaser: str
-    input_data: List[InputField]
+    input_data: Dict[str, Any]
 
 class ProvideInputRequest(BaseModel):
     job_id: str
@@ -208,12 +209,16 @@ async def start_job(data: StartJobRequest):
         #     input_data=data.input_data,
         #     network=NETWORK,
         # )
-        normalized_input = {item.key: item.value for item in data.input_data}
+        # normalized_input = {item.key: item.value for item in data.input_data}
+        identifier = hashlib.sha256(
+            data.identifier_from_purchaser.encode()
+        ).hexdigest()[:26]
+
         payment = Payment(
             agent_identifier=AGENT_IDENTIFIER,
             config=masumi_config,
-            identifier_from_purchaser=data.identifier_from_purchaser,
-            input_data=normalized_input,
+            identifier_from_purchaser=identifier,
+            input_data=data.input_data,
             network=NETWORK,
         )
 
@@ -227,9 +232,9 @@ async def start_job(data: StartJobRequest):
             "status": "awaiting_payment",
             "payment_status": "pending",
             "blockchain_identifier": blockchain_identifier,
-            "input_data": normalized_input,
+            "input_data": data.input_data,
             "result": None,
-            "identifier_from_purchaser": data.identifier_from_purchaser,
+            "identifier_from_purchaser": identifier,
         }
 
         # start monitoring (callback will be called on completion)
@@ -250,7 +255,7 @@ async def start_job(data: StartJobRequest):
             "externalDisputeUnlockTime": payment_request["data"].get("externalDisputeUnlockTime"),
             "agentIdentifier": AGENT_IDENTIFIER,
             "sellerVKey": SELLER_VKEY,
-            "identifierFromPurchaser": data.identifier_from_purchaser,
+            "identifierFromPurchaser": identifier,
             "amounts": amounts,
             "input_hash": getattr(payment, "input_hash", None),
             "payByTime": payment_request["data"].get("payByTime"),
@@ -355,16 +360,13 @@ async def input_schema():
     return {
         "input_data": [
             {
-                "id": "text",
+                "key": "text",
                 "type": "string",
-                "name": "Task Description",
-                "data": {
-                    "description": "Enter any city to get current weather.",
-                    "placeholder": "e.g. Weather in Mumbai",
-                },
+                "required": True
             }
         ]
     }
+
 
 # -----------------------------------------------------------------------------
 # Run app
