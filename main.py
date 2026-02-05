@@ -365,14 +365,16 @@ async def input_schema():
     return {
         "input_data": [
             {
-                "id": "text",
+                "id": "query",
                 "type": "text",
-                "name": "Task Description",
-                "required": True,
+                "name": "Weather Query",
                 "data": {
-                    "description": "Enter any city to get current weather.",
-                    "placeholder": "e.g. Weather in Mumbai",
+                    "placeholder": "e.g. Weather in Mumbai and Kolkata",
+                    "description": "Enter cities to get current weather"
                 },
+                "validations": [
+                    {"validation": "format", "value": "nonempty"}
+                ]
             }
         ]
     }
