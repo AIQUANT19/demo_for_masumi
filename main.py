@@ -156,7 +156,7 @@ class InputField(BaseModel):
 
 class StartJobRequest(BaseModel):
     identifier_from_purchaser: str
-    input_data: Dict[str, Any]
+    input_data: Any
 
 class ProvideInputRequest(BaseModel):
     job_id: str
@@ -363,20 +363,19 @@ async def check_availability():
 @app.get("/input_schema")
 async def input_schema():
     return {
-        "input_data": [
-            {
-                "id": "query",
-                "type": "text",
-                "name": "Weather Query",
-                "data": {
-                    "placeholder": "e.g. Weather in Mumbai and Kolkata",
-                    "description": "Enter cities to get current weather"
-                },
-                "validations": [
-                    {"validation": "format", "value": "nonempty"}
-                ]
-            }
+    
+        "id": "query",
+        "type": "text",
+        "name": "Weather Query",
+        "data": {
+            "placeholder": "e.g. Weather in Mumbai and Kolkata",
+            "description": "Enter cities to get current weather"
+        },
+        "validations": [
+            {"validation": "min", "value": "3"},
+            {"validation": "max", "value": "20"}
         ]
+
     }
 
 
