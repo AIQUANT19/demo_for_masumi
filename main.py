@@ -366,7 +366,7 @@ async def input_schema():
         "input_data": [
             {
                 "id": "text",
-                "type": "string",
+                "type": "text",
                 "name": "Task Description",
                 "required": True,
                 "data": {
