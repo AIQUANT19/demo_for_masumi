@@ -20,6 +20,8 @@ from langchain_openai import ChatOpenAI
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_tavily import TavilySearch
 
+import canonicaljson
+
 # Tavily - A research-oriented search API for AI agents
 
 # --- Masumi SDK (per your example) --------------------------------------------
@@ -65,6 +67,21 @@ except Exception:
 
 # Initialize LLM
 llm = ChatOpenAI(temperature=0.4, model_name="gpt-4o-mini", max_tokens=500)
+
+
+def _create_hash_from_payload(payload_string: str, identifier: str) -> str:
+    string_to_hash = f"{identifier};{payload_string}"
+    return hashlib.sha256(string_to_hash.encode("utf-8")).hexdigest()
+
+
+def create_masumi_input_hash(input_data: dict, identifier: str) -> str:
+    canonical = canonicaljson.encode_canonical_json(input_data).decode("utf-8")
+    return _create_hash_from_payload(canonical, identifier)
+
+
+def create_masumi_output_hash(output: str, identifier: str) -> str:
+    return _create_hash_from_payload(output, identifier)
+
 
 # Weather tool (kept as-is)
 @tool
@@ -156,7 +173,7 @@ class InputField(BaseModel):
 
 class StartJobRequest(BaseModel):
     identifier_from_purchaser: str
-    input_data: Any
+    input_data: dict
 
 class ProvideInputRequest(BaseModel):
     job_id: str
@@ -210,9 +227,8 @@ async def start_job(data: StartJobRequest):
         #     network=NETWORK,
         # )
         # normalized_input = {item.key: item.value for item in data.input_data}
-        identifier = hashlib.sha256(
-            data.identifier_from_purchaser.encode()
-        ).hexdigest()[:26]
+        identifier = data.identifier_from_purchaser
+        input_hash = create_masumi_input_hash(data.input_data, identifier)
 
         payment = Payment(
             agent_identifier=AGENT_IDENTIFIER,
@@ -236,6 +252,7 @@ async def start_job(data: StartJobRequest):
             "result": None,
             "identifier_from_purchaser": identifier,
             "amounts": amounts,
+            "input_hash": input_hash
         }
 
         # start monitoring (callback will be called on completion)
@@ -262,7 +279,7 @@ async def start_job(data: StartJobRequest):
             "sellerVKey": SELLER_VKEY,
             "identifierFromPurchaser": identifier,
             "amounts": amounts,
-            "input_hash": getattr(payment, "input_hash", None),
+            "input_hash": input_hash,
             "payByTime": payment_request["data"].get("payByTime"),
         }
 
@@ -287,12 +304,15 @@ async def handle_payment_status(job_id: str, payment_id: str) -> None:
 
         # Execute the agent with the job's input_data
         # For compatibility we pass a messages payload like /ask
-        user_text = job["input_data"].get("text") or str(job["input_data"]) 
+        # user_text = job["input_data"].get("text") or str(job["input_data"]) 
+        user_text = job["input_data"].get("query")
+
         payload = {"messages": [{"role": "user", "content": user_text}]}
 
         result = await invoke_agent(payload)
         messages = result.get("messages") or []
         assistant_msg = messages[-1].content if messages else str(result)
+        output_hash = create_masumi_output_hash(assistant_msg, job["identifier_from_purchaser"])
 
         # Mark payment completed on Masumi (send result back)
         payment_instance = payment_instances.get(job_id)
@@ -306,6 +326,7 @@ async def handle_payment_status(job_id: str, payment_id: str) -> None:
         job["status"] = "completed"
         job["payment_status"] = "completed"
         job["result"] = assistant_msg
+        job["output_hash"] = output_hash
 
         # stop monitoring
         if job_id in payment_instances:
@@ -363,20 +384,23 @@ async def check_availability():
 @app.get("/input_schema")
 async def input_schema():
     return {
-    
-        "id": "query",
-        "type": "text",
-        "name": "Weather Query",
-        "data": {
-            "placeholder": "e.g. Weather in Mumbai and Kolkata",
-            "description": "Enter cities to get current weather"
-        },
-        "validations": [
-            {"validation": "min", "value": "3"},
-            {"validation": "max", "value": "20"}
+        "input_data": [
+            {
+            "id": "query",
+            "type": "search",
+            "name": "Weather Query",
+            "data": {
+                "placeholder": "e.g. Weather in Mumbai and Kolkata",
+                "description": "Enter cities to get current weather"
+            },
+            "validations": [
+                {"validation": "min", "value": "3"},
+                {"validation": "max", "value": "50"}
+            ]
+            }
         ]
-
     }
+
 
 
 # -----------------------------------------------------------------------------
