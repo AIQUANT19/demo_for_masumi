@@ -305,8 +305,13 @@ async def handle_payment_status(job_id: str, payment_id: str) -> None:
         # Execute the agent with the job's input_data
         # For compatibility we pass a messages payload like /ask
         # user_text = job["input_data"].get("text") or str(job["input_data"]) 
-        user_text = job["input_data"].get("query")
+        now = get_current_date("Asia/Kolkata")
+        city = job["input_data"].get("query")
+        user_text = f"""
+            Current date/time: {now}
 
+            Now give today's weather for {city}.
+            """
         payload = {"messages": [{"role": "user", "content": user_text}]}
 
         result = await invoke_agent(payload)
@@ -390,7 +395,7 @@ async def input_schema():
             "type": "search",
             "name": "Weather Query",
             "data": {
-                "placeholder": "e.g. Weather in Mumbai and Kolkata",
+                "placeholder": "e.g. Kolkata",
                 "description": "Enter cities to get current weather"
             },
             "validations": [
