@@ -85,6 +85,7 @@ def create_masumi_output_hash(output: str, identifier: str) -> str:
 
 @tool
 def get_weather_update(city_name: str) -> str:
+    """This tool helps to find weather details in the giving city name"""
     if not WEATHERSTACK_API_KEY:
         return "❌ Weatherstack API key is missing."
 
